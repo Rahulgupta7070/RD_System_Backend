@@ -16,16 +16,16 @@ public class RdSchedulerController {
         this.service = service;
     }
 
-    // 💰 MATURITY (ADMIN + SUPER ADMIN)
+    // 💰 MATURITY
     @GetMapping("/maturity/{rid}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public double getMaturity(@PathVariable int rid) {
         return service.getMaturity(rid);
     }
-    
-    // 🧮 CALCULATOR (ADMIN + SUPER ADMIN)
+
+    // 🧮 CALCULATOR
     @GetMapping("/calculate")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public double calculate(
             @RequestParam double amount,
             @RequestParam int months,

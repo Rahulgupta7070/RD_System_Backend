@@ -21,9 +21,10 @@ public class JwtFilter extends OncePerRequestFilter {
         this.jwtUtil = jwtUtil;
     }
 
+    // ✅ ONLY LOGIN SKIP
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getServletPath().startsWith("/auth");
+        return request.getServletPath().equals("/auth/login");
     }
 
     @Override
@@ -34,26 +35,43 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        if (header != null && header.startsWith("Bearer ")) {
+        // ✅ Check header
+        if (header == null || !header.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            String token = header.substring(7);
+        String token = header.substring(7);
+
+        try {
+            // ✅ Validate token (expiry check)
+            if (!jwtUtil.validateToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             String username = jwtUtil.extractUsername(token);
             String role = jwtUtil.extractRole(token);
 
-            // 🔥 FIX HERE
-            String authority = "ROLE_" + role;
+            // ✅ Avoid duplicate auth
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
-                            username,
-                            null,
-                            List.of(new SimpleGrantedAuthority(authority))
-                    );
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(
+                                username,
+                                null,
+                                List.of(new SimpleGrantedAuthority(role))
+                        );
 
-            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                auth.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
 
-            SecurityContextHolder.getContext().setAuthentication(auth);
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
+
+        } catch (Exception e) {
+            System.out.println("JWT Error: " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);

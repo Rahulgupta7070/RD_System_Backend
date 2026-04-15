@@ -25,34 +25,32 @@ public class PasController {
         this.rdService = rdService;
     }
 
-    // ADMIN
+    // ✅ GET ALL PASSBOOK USERS
     @GetMapping("/allPassUser")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<List<RdPassbook>> getAll() {
         return ResponseEntity.ok(pasrepo.findAll());
     }
 
-    // ADMIN
+    // ✅ GET BY ID
     @GetMapping("/puser/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<RdPassbook> getById(@PathVariable int id) {
         return pasrepo.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // ADMIN
+    // ✅ GET BY RID
     @GetMapping("/passbook/{rid}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<List<RdPassbook>> getByRid(@PathVariable int rid) {
         return ResponseEntity.ok(pasrepo.findByRid(rid));
     }
 
-    // ❌ REMOVE /my-passbook (username based not valid now)
-
-    // ADMIN ONLY
+    // ✅ SAVE
     @PostMapping("/psave")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<RdPassbook> save(@Valid @RequestBody RdPassbook ps) {
 
         rdService.calculateLateFine(ps);
@@ -62,9 +60,9 @@ public class PasController {
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
-    // ADMIN
+    // ✅ DELETE
     @DeleteMapping("/pdelete/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<String> delete(@PathVariable int id) {
 
         if (!pasrepo.existsById(id)) {
@@ -76,9 +74,9 @@ public class PasController {
         return ResponseEntity.ok("Deleted successfully");
     }
 
-    // ADMIN
+    // ✅ UPDATE
     @PutMapping("/pupdate/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<RdPassbook> update(
             @PathVariable int id,
             @Valid @RequestBody RdPassbook ps) {

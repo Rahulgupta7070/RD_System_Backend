@@ -37,8 +37,8 @@ public class RdController {
         return "API Working 🚀";
     }
 
-    // ✅ ADMIN + SUPER ADMIN: GET ALL USERS
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    // ✅ GET ALL USERS
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @GetMapping("/allUser")
     public ResponseEntity<Page<RdUser>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
@@ -51,7 +51,7 @@ public class RdController {
     }
 
     // ✅ GET USER BY ID
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<RdUser> getUserById(@PathVariable int id) {
         return rdrepo.findById(id)
@@ -60,7 +60,7 @@ public class RdController {
     }
 
     // ✅ SAVE USER
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @PostMapping("/saveUser")
     public ResponseEntity<RdUser> saveUser(@Valid @RequestBody RdUser rd) {
 
@@ -69,7 +69,7 @@ public class RdController {
     }
 
     // ✅ DELETE USER
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteUser(@PathVariable int id) {
 
@@ -83,7 +83,7 @@ public class RdController {
     }
 
     // ✅ UPDATE USER
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @PutMapping("/update/{id}")
     public ResponseEntity<RdUser> updateUser(
             @PathVariable int id,
@@ -117,7 +117,7 @@ public class RdController {
     }
 
     // ✅ SEARCH
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @GetMapping("/search")
     public Page<RdUser> searchUsers(
             @RequestParam String keyword,
@@ -137,7 +137,7 @@ public class RdController {
     }
 
     // ✅ FILTER
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @GetMapping("/filter")
     public Page<RdUser> filterUsers(
             @RequestParam(required = false) String startDate,
