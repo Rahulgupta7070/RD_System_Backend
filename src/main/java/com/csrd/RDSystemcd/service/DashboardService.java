@@ -1,7 +1,10 @@
 package com.csrd.RDSystemcd.service;
 
 import com.csrd.RDSystemcd.entity.RdUser;
+import com.csrd.RDSystemcd.entity.RdPassbook;
 import com.csrd.RDSystemcd.repo.Rdrepo;
+import com.csrd.RDSystemcd.repo.Cdpassbrepo;
+
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -10,34 +13,56 @@ import java.util.*;
 public class DashboardService {
 
     private final Rdrepo rdrepo;
+    private final Cdpassbrepo passbookRepo;
+    private final SchedulerService schedulerService;
 
-    public DashboardService(Rdrepo rdrepo) {
+    public DashboardService(Rdrepo rdrepo,
+                            Cdpassbrepo passbookRepo,
+                            SchedulerService schedulerService) {
         this.rdrepo = rdrepo;
+        this.passbookRepo = passbookRepo;
+        this.schedulerService = schedulerService;
     }
 
+    // ================= DASHBOARD SUMMARY =================
     public Map<String, Object> getSummary() {
+
         List<RdUser> users = rdrepo.findAll();
+        List<RdPassbook> passbooks = passbookRepo.findAll();
 
         int totalUsers = users.size();
 
-        double totalDeposit = users.stream()
-                .filter(u -> u.getRdAmount() != null)
-                .mapToDouble(u -> u.getRdAmount().doubleValue())
+        // ✅ TOTAL DEPOSIT (REAL DATA)
+        double totalDeposit = passbooks.stream()
+                .filter(p -> p.getRdAmount() != null)
+                .mapToDouble(p -> p.getRdAmount().doubleValue())
                 .sum();
 
-        double totalInterest = totalDeposit * 0.05;
-        double totalFine = totalUsers * 50;
+        // ✅ TOTAL MATURITY (VERY IMPORTANT)
+        double totalMaturity = users.stream()
+                .mapToDouble(u -> schedulerService.getMaturity(u.getRid()))
+                .sum();
 
+        // ✅ TOTAL INTEREST (CORRECT)
+        double totalInterest = totalMaturity - totalDeposit;
+
+        // ✅ TOTAL FINE
+        double totalFine = passbooks.stream()
+                .mapToDouble(p -> p.getFineAmount() == null ? 0 : p.getFineAmount())
+                .sum();
+
+        // ✅ ACTIVE ACCOUNTS
         long activeAccounts = users.stream()
                 .filter(u -> u.getRdAmount() != null && u.getRdAmount().doubleValue() > 0)
                 .count();
 
+        // ✅ COMPLETED ACCOUNTS
         long completedAccounts = totalUsers - activeAccounts;
 
         Map<String, Object> data = new HashMap<>();
         data.put("totalUsers", totalUsers);
         data.put("totalDeposit", totalDeposit);
-        data.put("totalInterest", totalInterest);
+        data.put("totalInterest", Math.round(totalInterest * 100.0) / 100.0);
         data.put("totalFine", totalFine);
         data.put("activeAccounts", activeAccounts);
         data.put("completedAccounts", completedAccounts);
@@ -45,8 +70,10 @@ public class DashboardService {
         return data;
     }
 
+    // ================= MONTHLY COLLECTION =================
     public List<Map<String, Object>> getMonthlyCollection() {
-        List<RdUser> users = rdrepo.findAll();
+
+        List<RdPassbook> passbooks = passbookRepo.findAll();
 
         Map<String, Double> monthlyData = new LinkedHashMap<>();
         monthlyData.put("JAN", 0.0);
@@ -62,13 +89,18 @@ public class DashboardService {
         monthlyData.put("NOV", 0.0);
         monthlyData.put("DEC", 0.0);
 
-        for (RdUser u : users) {
-            if (u.getRdDate() != null && u.getRdAmount() != null) {
-                String month = u.getRdDate().getMonth().toString().substring(0, 3);
+        for (RdPassbook p : passbooks) {
+
+            if (p.getRdDate() != null && p.getRdAmount() != null) {
+
+                String month = p.getRdDate()
+                        .getMonth()
+                        .toString()
+                        .substring(0, 3);
 
                 monthlyData.put(
                         month,
-                        monthlyData.get(month) + u.getRdAmount().doubleValue()
+                        monthlyData.get(month) + p.getRdAmount().doubleValue()
                 );
             }
         }
@@ -76,9 +108,11 @@ public class DashboardService {
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (Map.Entry<String, Double> entry : monthlyData.entrySet()) {
+
             Map<String, Object> map = new HashMap<>();
             map.put("month", entry.getKey());
             map.put("amount", entry.getValue());
+
             result.add(map);
         }
 

@@ -6,21 +6,28 @@ import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Service;
 
 import com.csrd.RDSystemcd.entity.RdPassbook;
-
+import com.csrd.RDSystemcd.entity.RdUser;
 
 @Service
 public class RdPasService {
 
-    public void calculateLateFine(RdPassbook passbook) {
+    public void calculateLateFine(RdPassbook passbook, RdUser user) {
 
         LocalDate paymentDate = passbook.getRdDate();
 
+        // 🔥 RD start date (15)
+        int rdDay = user.getRdDate().getDayOfMonth();
+
+        // 🔥 current month ka valid due date
+        int validDay = Math.min(rdDay, paymentDate.lengthOfMonth());
+
         LocalDate dueDate = LocalDate.of(
-            paymentDate.getYear(),
-            paymentDate.getMonth(),
-            5
+                paymentDate.getYear(),
+                paymentDate.getMonth(),
+                validDay
         );
 
+        // 🔥 Late check
         if (paymentDate.isAfter(dueDate)) {
 
             long lateDays = ChronoUnit.DAYS.between(dueDate, paymentDate);

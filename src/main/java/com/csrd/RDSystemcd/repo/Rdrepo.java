@@ -1,12 +1,14 @@
 package com.csrd.RDSystemcd.repo;
 
+import java.time.LocalDate;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import com.csrd.RDSystemcd.entity.RdUser;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface Rdrepo extends JpaRepository<RdUser, Integer>, JpaSpecificationExecutor<RdUser> {
@@ -17,4 +19,5 @@ public interface Rdrepo extends JpaRepository<RdUser, Integer>, JpaSpecification
             String aadhar, String account, Pageable pageable);
 
     Page<RdUser> findAll(Pageable pageable);
+   
 }

@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import com.csrd.RDSystemcd.entity.RdUser;
 import com.csrd.RDSystemcd.repo.Rdrepo;
 import com.csrd.RDSystemcd.service.RDService;
+import com.csrd.RDSystemcd.service.EmailService;
 
 import jakarta.validation.Valid;
 
@@ -26,12 +27,15 @@ public class RdController {
 
     private final RDService rdService;
     private final Rdrepo rdrepo;
+    private final EmailService emailService;
 
-    public RdController(Rdrepo rdrepo, RDService rdService) {
+    public RdController(Rdrepo rdrepo, RDService rdService, EmailService emailService) {
         this.rdrepo = rdrepo;
         this.rdService = rdService;
+        this.emailService = emailService;
     }
 
+    // ✅ TEST
     @GetMapping("/test")
     public String test() {
         return "API Working 🚀";
@@ -59,12 +63,26 @@ public class RdController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // ✅ SAVE USER
+    // ✅ SAVE USER + EMAIL
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     @PostMapping("/saveUser")
     public ResponseEntity<RdUser> saveUser(@Valid @RequestBody RdUser rd) {
 
         RdUser savedUser = rdrepo.save(rd);
+
+        // 🔥 EMAIL SEND (SAFE)
+        if (savedUser.getEmail() != null &&
+            savedUser.getRdDate() != null &&
+            savedUser.getRdAmount() != null) {
+
+            emailService.sendUserEmail(
+                savedUser.getEmail(),
+                savedUser.getName(),
+                savedUser.getRdDate().toString(),
+                savedUser.getRdAmount().toString()
+            );
+        }
+
         return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
     }
 
@@ -98,6 +116,7 @@ public class RdController {
         RdUser existing = optionalUser.get();
 
         existing.setName(rd.getName());
+        existing.setEmail(rd.getEmail());
         existing.setAddress(rd.getAddress());
         existing.setDob(rd.getDob());
         existing.setGender(rd.getGender());

@@ -8,8 +8,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.csrd.RDSystemcd.entity.RdPassbook;
+import com.csrd.RDSystemcd.entity.RdUser;
 import com.csrd.RDSystemcd.repo.Cdpassbrepo;
+import com.csrd.RDSystemcd.repo.Rdrepo;
 import com.csrd.RDSystemcd.service.RdPasService;
+import com.csrd.RDSystemcd.service.EmailService;
 
 import jakarta.validation.Valid;
 
@@ -19,10 +22,18 @@ public class PasController {
 
     private final Cdpassbrepo pasrepo;
     private final RdPasService rdService;
+    private final Rdrepo userRepo;
+    private final EmailService emailService;
 
-    public PasController(Cdpassbrepo pasrepo, RdPasService rdService) {
+    // ✅ CONSTRUCTOR
+    public PasController(Cdpassbrepo pasrepo,
+                         RdPasService rdService,
+                         Rdrepo userRepo,
+                         EmailService emailService) {
         this.pasrepo = pasrepo;
         this.rdService = rdService;
+        this.userRepo = userRepo;
+        this.emailService = emailService;
     }
 
     // ✅ GET ALL PASSBOOK USERS
@@ -48,14 +59,60 @@ public class PasController {
         return ResponseEntity.ok(pasrepo.findByRid(rid));
     }
 
-    // ✅ SAVE
+    // ✅ SAVE + EMAIL SEND 🔥
+//    @PostMapping("/psave")
+//    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+//   public ResponseEntity<RdPassbook> save(@Valid @RequestBody RdPassbook ps) {
+//
+//    // 🔥 USER FETCH (PEHLE KARO)
+//    RdUser user = userRepo.findById(ps.getRid())
+//            .orElseThrow(() -> new RuntimeException("User not found"));
+//
+//    // 🔥 LATE FINE CALCULATE (USER KE SAATH)
+//    rdService.calculateLateFine(ps, user);
+//
+//    // 🔥 SAVE
+//    RdPassbook saved = pasrepo.save(ps);
+//
+//    // 🔥 EMAIL SEND
+//    if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+//        emailService.sendDepositEmail(
+//                user.getEmail(),
+//                user.getName(),
+//                ps.getRdAmount().toString(),
+//                ps.getRdDate().toString()
+//        );
+//    }
+//
+//    return new ResponseEntity<>(saved, HttpStatus.CREATED);
+//}
+    
     @PostMapping("/psave")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<RdPassbook> save(@Valid @RequestBody RdPassbook ps) {
 
-        rdService.calculateLateFine(ps);
+        // 🔥 USER FETCH
+        RdUser user = userRepo.findById(ps.getRid())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // 🔥 LATE FINE CALCULATE
+        rdService.calculateLateFine(ps, user);
+
+        // 🔥 SAVE
         RdPassbook saved = pasrepo.save(ps);
+
+        // 🔥 EMAIL SEND
+        if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+            emailService.sendDepositEmail(
+                user.getEmail(),
+                user.getName(),
+                saved.getRdAmount().toString(),
+                saved.getRdDate().toString(),
+                saved.getLateDay(),
+                saved.getFineAmount(),
+                saved.getStatus()
+            );
+        }
 
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
@@ -75,6 +132,22 @@ public class PasController {
     }
 
     // ✅ UPDATE
+//    @PutMapping("/pupdate/{id}")
+//    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+//    public ResponseEntity<RdPassbook> update(
+//            @PathVariable int id,
+//            @Valid @RequestBody RdPassbook ps) {
+//
+//        if (!pasrepo.existsById(id)) {
+//            return ResponseEntity.notFound().build();
+//        }
+//
+//        rdService.calculateLateFine(ps);
+//
+//        ps.setPid(id);
+//
+//        return ResponseEntity.ok(pasrepo.save(ps));
+//    }
     @PutMapping("/pupdate/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<RdPassbook> update(
@@ -85,10 +158,32 @@ public class PasController {
             return ResponseEntity.notFound().build();
         }
 
-        rdService.calculateLateFine(ps);
+        // 🔥 USER FETCH (IMPORTANT)
+        RdUser user = userRepo.findById(ps.getRid())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // 🔥 LATE FINE CALCULATE (CORRECT)
+        rdService.calculateLateFine(ps, user);
+
+        // 🔥 SET ID
         ps.setPid(id);
 
-        return ResponseEntity.ok(pasrepo.save(ps));
+        // 🔥 SAVE
+        RdPassbook updated = pasrepo.save(ps);
+
+        // 🔥 EMAIL SEND (OPTIONAL BUT RECOMMENDED)
+        if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+            emailService.sendDepositEmail(
+                user.getEmail(),
+                user.getName(),
+                updated.getRdAmount().toString(),
+                updated.getRdDate().toString(),
+                updated.getLateDay(),
+                updated.getFineAmount(),
+                updated.getStatus()
+            );
+        }
+
+        return ResponseEntity.ok(updated);
     }
 }

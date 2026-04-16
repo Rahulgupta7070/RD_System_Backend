@@ -3,6 +3,7 @@ package com.csrd.RDSystemcd.service;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.csrd.RDSystemcd.entity.RdPassbook;
@@ -16,9 +17,12 @@ public class SchedulerService {
     private final Rdrepo rdrepo;
     private final Cdpassbrepo passrepo;
 
-    public SchedulerService(Rdrepo rdrepo, Cdpassbrepo passrepo) {
+    private final EmailService emailService;
+
+    public SchedulerService(Rdrepo rdrepo, Cdpassbrepo passrepo, EmailService emailService) {
         this.rdrepo = rdrepo;
         this.passrepo = passrepo;
+        this.emailService = emailService;
     }
 
     // Monthly deposit
@@ -49,31 +53,27 @@ public class SchedulerService {
     }
 
     //  FIXED MATURITY
-    public double getMaturity(int rid) {
+public double getMaturity(int rid) {
 
-        List<RdPassbook> list = passrepo.findByRid(rid);
+    List<RdPassbook> list = passrepo.findByRid(rid);
 
-        if (list.isEmpty()) return 0;
+    if (list.isEmpty()) return 0;
 
-        double total = 0;
-        double interest = 0;
+    int n = list.size(); // months count
 
-        double rate = 7; // yearly %
+    double total = list.stream()
+            .mapToDouble(p -> p.getRdAmount().doubleValue())
+            .sum();
 
-        int n = list.size();
+    // assume monthly amount (same deposit every month)
+    double P = total / n;
 
-        for (int i = 0; i < n; i++) {
+    double rate = 7; // yearly %
 
-            double amount = list.get(i).getRdAmount().doubleValue();
+    // ✅ RD FORMULA
+    double maturity = P * n +
+            (P * n * (n + 1) / 2.0) * (rate / (12 * 100));
 
-            total += amount;
-
-            // interest for remaining months
-            interest += amount * (rate / 100) * ((n - i) / 12.0);
-        }
-
-        double maturity = total + interest;
-
-        return Math.round(maturity * 100.0) / 100.0;
-    }
+    return Math.round(maturity * 100.0) / 100.0;
+}
 }
