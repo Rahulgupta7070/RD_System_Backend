@@ -1,13 +1,15 @@
 package com.csrd.RDSystemcd.service;
 
 
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import com.csrd.RDSystemcd.repo.AdminRepo;
 import com.csrd.RDSystemcd.entity.Admin;
+import com.csrd.RDSystemcd.repo.AdminRepo;
+
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.mail.javamail.MimeMessageHelper;
 
 @Service
 public class EmailService {
@@ -202,6 +204,20 @@ e.printStackTrace();
 }
 }
 
+public void sendPdf(String to, byte[] pdf) throws Exception {
+
+    MimeMessage message = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+    helper.setTo(to);
+    helper.setSubject("RD Completed 🎉");
+    helper.setText("Your RD is completed. PDF attached.");
+
+    helper.addAttachment("RD_Statement.pdf",
+            new ByteArrayResource(pdf));
+
+    mailSender.send(message);
+}
 
 
 }

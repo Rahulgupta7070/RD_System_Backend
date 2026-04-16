@@ -40,6 +40,12 @@ public class RdUser {
     private String nomineeAddress;
     private String nomineeAadharNo;
 
+    
+    @Column(name = "total_months")
+    private int totalMonths; // 6 / 12 / 24
+    
+    public int getTotalMonths() { return totalMonths; }
+    public void setTotalMonths(int totalMonths) { this.totalMonths = totalMonths; }
 
     // getters setters
 
