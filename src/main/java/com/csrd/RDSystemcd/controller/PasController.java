@@ -5,24 +5,17 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
 
 import com.csrd.RDSystemcd.entity.RdPassbook;
 import com.csrd.RDSystemcd.entity.RdUser;
 import com.csrd.RDSystemcd.repo.Cdpassbrepo;
 import com.csrd.RDSystemcd.repo.Rdrepo;
-import com.csrd.RDSystemcd.service.EmailService;
-import com.csrd.RDSystemcd.service.PdfService;
-import com.csrd.RDSystemcd.service.RdPasService;
-import com.csrd.RDSystemcd.service.SchedulerService;
+import com.csrd.RDSystemcd.service.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @CrossOrigin(origins = "http://localhost:5173")
@@ -34,21 +27,24 @@ public class PasController {
     private final Rdrepo userRepo;
     private final EmailService emailService;
     private final SchedulerService schedulerService;
-    private final  PdfService pdfService;
-    
-    
+    private final PdfService pdfService;
+    private final AuditService auditService;
+
     public PasController(Cdpassbrepo pasrepo,
                          RdPasService rdService,
                          Rdrepo userRepo,
                          EmailService emailService,
                          SchedulerService schedulerService,
-                         PdfService pdfService) {
+                         PdfService pdfService,
+                         AuditService auditService) {
+
         this.pasrepo = pasrepo;
         this.rdService = rdService;
         this.userRepo = userRepo;
         this.emailService = emailService;
-        this.schedulerService =schedulerService;
-        this.pdfService =pdfService;
+        this.schedulerService = schedulerService;
+        this.pdfService = pdfService;
+        this.auditService = auditService;
     }
 
     // ================= GET ALL =================
@@ -58,15 +54,6 @@ public class PasController {
         return ResponseEntity.ok(pasrepo.findAll());
     }
 
-    // ================= GET BY ID =================
-    @GetMapping("/puser/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
-    public ResponseEntity<RdPassbook> getById(@PathVariable int id) {
-        return pasrepo.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
     // ================= GET BY RID =================
     @GetMapping("/passbook/{rid}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
@@ -74,59 +61,87 @@ public class PasController {
         return ResponseEntity.ok(pasrepo.findByRid(rid));
     }
 
-    // ================= SAVE (MAIN LOGIC) =================
+    // ================= SAVE =================
     @PostMapping("/psave")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
-   public ResponseEntity<?> save(@Valid @RequestBody RdPassbook ps) throws Exception {
+    public ResponseEntity<?> save(@Valid @RequestBody RdPassbook ps,
+                                 HttpServletRequest request) throws Exception {
 
-    // 🔥 USER FETCH
-    RdUser user = userRepo.findById(ps.getRid())
-            .orElseThrow(() -> new RuntimeException("User not found"));
+        RdUser user = userRepo.findById(ps.getRid())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-    // 🔥 CHECK RD LIMIT
-    List<RdPassbook> list = pasrepo.findByRid(ps.getRid());
+        List<RdPassbook> history = pasrepo.findByRid(ps.getRid());
 
-    if (list.size() >= user.getTotalMonths()) {
-        return ResponseEntity.badRequest()
-                .body("RD completed! No more deposits allowed ❌");
-    }
+        // ❌ RD COMPLETE BLOCK
+        if (history.size() >= user.getTotalMonths()) {
+            return ResponseEntity.badRequest()
+                    .body("RD completed! No more deposits allowed ❌");
+        }
 
-    // 🔥 STATUS SET
-    if (list.size() + 1 == user.getTotalMonths()) {
-        ps.setStatus("COMPLETED");
-    } else {
-        ps.setStatus("PAID");
-    }
-
-    // 🔥 LATE FINE
-    rdService.calculateLateFine(ps, user);
-
-    // 🔥 SAVE
-    RdPassbook saved = pasrepo.save(ps);
-
-    // 🔥 NORMAL EMAIL
-    if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
-        emailService.sendDepositEmail(
-            user.getEmail(),
-            user.getName(),
-            saved.getRdAmount().toString(),
-            saved.getRdDate().toString(),
-            saved.getLateDay(),
-            saved.getFineAmount(),
-            saved.getStatus()
+        // ❌ SAME MONTH DUPLICATE BLOCK
+        boolean alreadyPaid = pasrepo.existsByRidAndMonth(
+                user.getRid(),
+                ps.getRdDate().getMonthValue(),
+                ps.getRdDate().getYear()
         );
+
+        if (alreadyPaid) {
+            return ResponseEntity.badRequest()
+                    .body("Already deposited for this month ❌");
+        }
+
+        // 🔥 LATE FINE FIXED LOGIC
+        rdService.calculateLateFine(ps, user, history);
+
+        // ✅ STATUS
+        if (history.size() + 1 == user.getTotalMonths()) {
+            ps.setStatus("COMPLETED");
+        }
+
+        RdPassbook saved = pasrepo.save(ps);
+
+        // ================= EMAIL =================
+        if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+            emailService.sendDepositEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    saved.getRdAmount().toString(),
+                    saved.getRdDate().toString(),
+                    saved.getLateDay(),
+                    saved.getFineAmount(),
+                    saved.getStatus()
+            );
+        }
+
+        // ================= PDF CHECK =================
+        schedulerService.checkAndSendPdf(ps.getRid());
+
+        // ================= AUDIT =================
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        String role = auth.getAuthorities().iterator().next().getAuthority();
+
+        auditService.log(
+                "ADD_DEPOSIT",
+                username,
+                role,
+                "User: " + user.getName() +
+                " | Amount: " + saved.getRdAmount() +
+                " | Date: " + saved.getRdDate() +
+                " | Status: " + saved.getStatus() +
+                " | Fine: " + saved.getFineAmount(),
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
+
+        return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
-
-    // 🔥🔥 MOST IMPORTANT (ADD THIS)
-    schedulerService.checkAndSendPdf(ps.getRid());
-
-    return new ResponseEntity<>(saved, HttpStatus.CREATED);
-}
 
     // ================= DELETE =================
     @DeleteMapping("/pdelete/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
-    public ResponseEntity<String> delete(@PathVariable int id) {
+    public ResponseEntity<String> delete(@PathVariable int id,
+                                         HttpServletRequest request) {
 
         if (!pasrepo.existsById(id)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -134,47 +149,67 @@ public class PasController {
         }
 
         pasrepo.deleteById(id);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        String role = auth.getAuthorities().iterator().next().getAuthority();
+
+        auditService.log(
+                "DELETE_DEPOSIT",
+                username,
+                role,
+                "Deleted deposit ID: " + id,
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
+
         return ResponseEntity.ok("Deleted successfully");
     }
 
     // ================= UPDATE =================
     @PutMapping("/pupdate/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
-    public ResponseEntity<?> update(
-            @PathVariable int id,
-            @Valid @RequestBody RdPassbook ps) {
+    public ResponseEntity<?> update(@PathVariable int id,
+                                   @Valid @RequestBody RdPassbook ps,
+                                   HttpServletRequest request) {
 
         if (!pasrepo.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
 
-        // 🔥 USER FETCH
         RdUser user = userRepo.findById(ps.getRid())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        List<RdPassbook> history = pasrepo.findByRid(ps.getRid())
+                .stream()
+                .sorted((a, b) -> a.getRdDate().compareTo(b.getRdDate()))
+                .toList();
 
-        // 🔥 LATE FINE CALCULATE
-        rdService.calculateLateFine(ps, user);
+        rdService.calculateLateFine(ps, user, history);
 
         ps.setPid(id);
 
         RdPassbook updated = pasrepo.save(ps);
 
-        // 🔥 EMAIL SEND
-        if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
-            emailService.sendDepositEmail(
-                user.getEmail(),
-                user.getName(),
-                updated.getRdAmount().toString(),
-                updated.getRdDate().toString(),
-                updated.getLateDay(),
-                updated.getFineAmount(),
-                updated.getStatus()
-            );
-        }
+        // ================= AUDIT =================
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        String role = auth.getAuthorities().iterator().next().getAuthority();
+
+        auditService.log(
+                "UPDATE_DEPOSIT",
+                username,
+                role,
+                "Updated ID: " + id +
+                " | Amount: " + updated.getRdAmount() +
+                " | Status: " + updated.getStatus(),
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
 
         return ResponseEntity.ok(updated);
     }
-    
+
+    // ================= PDF =================
     @GetMapping("/pdf/{rid}")
     public ResponseEntity<byte[]> getPdf(@PathVariable int rid) throws Exception {
 

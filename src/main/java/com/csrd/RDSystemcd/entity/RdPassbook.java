@@ -19,7 +19,7 @@ public class RdPassbook {
     @Column(name = "rid")
     private int rid;
 
-    // ❌ @NotNull हटाया (backend set करेगा)
+    //  @NotNull हटाया (backend set करेगा)
     @Column(name = "rd_date")
     private LocalDate rdDate;
 
@@ -38,7 +38,7 @@ public class RdPassbook {
     @Column(name = "fine_amount")
     private Integer fineAmount;
 
-    // ❌ @NotBlank हटाया (backend set करेगा)
+    //  @NotBlank हटाया (backend set करेगा)
     private String status;
 
     // ===== GETTERS & SETTERS =====

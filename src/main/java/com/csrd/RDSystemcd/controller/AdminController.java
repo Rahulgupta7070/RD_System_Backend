@@ -20,14 +20,14 @@ public class AdminController {
         this.repo = repo;
     }
 
-    // 👑 GET ALL ADMINS (ONLY SUPER ADMIN)
+    //  GET ALL ADMINS (ONLY SUPER ADMIN)
     @GetMapping("/all")
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     public List<Admin> getAllAdmins() {
         return repo.findAll();
     }
 
-    // ❌ DELETE ADMIN
+    //  DELETE ADMIN
     @DeleteMapping("/delete/{id}")
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     public ResponseEntity<String> deleteAdmin(@PathVariable int id) {
@@ -38,7 +38,7 @@ public class AdminController {
             return ResponseEntity.notFound().build();
         }
 
-        // ❌ SUPER ADMIN DELETE BLOCK
+        //  SUPER ADMIN DELETE BLOCK
         if ("ROLE_SUPER_ADMIN".equals(admin.getRole())) {
             return ResponseEntity.badRequest()
                     .body("Cannot delete Super Admin ❌");

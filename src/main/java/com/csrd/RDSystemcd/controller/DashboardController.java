@@ -19,14 +19,14 @@ public class DashboardController {
         this.dashboardService = dashboardService;
     }
 
-    // ✅ SUMMARY
+    //  SUMMARY
     @GetMapping("/summary")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public Map<String, Object> getSummary() {
         return dashboardService.getSummary();
     }
 
-    // ✅ MONTHLY COLLECTION
+    //  MONTHLY COLLECTION
     @GetMapping("/monthly-collection")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public List<Map<String, Object>> getMonthlyCollection() {

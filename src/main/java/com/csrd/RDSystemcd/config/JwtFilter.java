@@ -21,7 +21,7 @@ public class JwtFilter extends OncePerRequestFilter {
         this.jwtUtil = jwtUtil;
     }
 
-    // ✅ ONLY LOGIN SKIP
+    //  ONLY LOGIN SKIP
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return request.getServletPath().equals("/auth/login");

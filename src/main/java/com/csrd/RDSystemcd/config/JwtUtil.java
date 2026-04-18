@@ -15,7 +15,7 @@ public class JwtUtil {
 
     private final long EXPIRATION_TIME = 1000 * 60 * 60 * 10; // 10 hours
 
-    // ✅ GENERATE TOKEN
+    // GENERATE TOKEN
     public String generateToken(String username, String role) {
         return Jwts.builder()
                 .setSubject(username)
@@ -35,24 +35,24 @@ public class JwtUtil {
                 .getBody();
     }
 
-    // ✅ USERNAME
+    //  USERNAME
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
     }
 
-    // ✅ ROLE
+    //  ROLE
     public String extractRole(String token) {
         return (String) extractAllClaims(token).get("role");
     }
 
-    // ✅ CHECK EXPIRED
+    //  CHECK EXPIRED
     public boolean isTokenExpired(String token) {
         return extractAllClaims(token)
                 .getExpiration()
                 .before(new Date());
     }
 
-    // ✅ VALIDATE TOKEN
+    //  VALIDATE TOKEN
     public boolean validateToken(String token) {
         try {
             return !isTokenExpired(token);

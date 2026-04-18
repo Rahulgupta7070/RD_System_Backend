@@ -16,14 +16,14 @@ public class RdSchedulerController {
         this.service = service;
     }
 
-    // 💰 MATURITY
+    // MATURITY
     @GetMapping("/maturity/{rid}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public double getMaturity(@PathVariable int rid) {
         return service.getMaturity(rid);
     }
 
-    // 🧮 CALCULATOR
+    // CALCULATOR
     @GetMapping("/calculate")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public double calculate(

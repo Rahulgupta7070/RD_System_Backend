@@ -32,32 +32,32 @@ public class DashboardService {
 
         int totalUsers = users.size();
 
-        // ✅ TOTAL DEPOSIT (REAL DATA)
+        // ✅ TOTAL DEPOSIT
         double totalDeposit = passbooks.stream()
                 .filter(p -> p.getRdAmount() != null)
                 .mapToDouble(p -> p.getRdAmount().doubleValue())
                 .sum();
 
-        // ✅ TOTAL MATURITY (VERY IMPORTANT)
-        double totalMaturity = users.stream()
-                .mapToDouble(u -> schedulerService.getMaturity(u.getRid()))
-                .sum();
+        // ✅ TOTAL MATURITY
+        double totalMaturity = 0;
+        for (RdUser u : users) {
+            totalMaturity += schedulerService.getMaturity(u.getRid());
+        }
 
-        // ✅ TOTAL INTEREST (CORRECT)
+        // ✅ INTEREST
         double totalInterest = totalMaturity - totalDeposit;
 
-        // ✅ TOTAL FINE
+        // ✅ TOTAL FINE (NULL SAFE)
         double totalFine = passbooks.stream()
                 .mapToDouble(p -> p.getFineAmount() == null ? 0 : p.getFineAmount())
                 .sum();
 
-        // ✅ ACTIVE ACCOUNTS
-        long activeAccounts = users.stream()
-                .filter(u -> u.getRdAmount() != null && u.getRdAmount().doubleValue() > 0)
+        // ✅ ACTIVE & COMPLETED LOGIC FIX
+        long completedAccounts = users.stream()
+                .filter(u -> passbookRepo.findByRid(u.getRid()).size() == u.getTotalMonths())
                 .count();
 
-        // ✅ COMPLETED ACCOUNTS
-        long completedAccounts = totalUsers - activeAccounts;
+        long activeAccounts = totalUsers - completedAccounts;
 
         Map<String, Object> data = new HashMap<>();
         data.put("totalUsers", totalUsers);
@@ -76,18 +76,15 @@ public class DashboardService {
         List<RdPassbook> passbooks = passbookRepo.findAll();
 
         Map<String, Double> monthlyData = new LinkedHashMap<>();
-        monthlyData.put("JAN", 0.0);
-        monthlyData.put("FEB", 0.0);
-        monthlyData.put("MAR", 0.0);
-        monthlyData.put("APR", 0.0);
-        monthlyData.put("MAY", 0.0);
-        monthlyData.put("JUN", 0.0);
-        monthlyData.put("JUL", 0.0);
-        monthlyData.put("AUG", 0.0);
-        monthlyData.put("SEP", 0.0);
-        monthlyData.put("OCT", 0.0);
-        monthlyData.put("NOV", 0.0);
-        monthlyData.put("DEC", 0.0);
+
+        String[] months = {
+                "JAN","FEB","MAR","APR","MAY","JUN",
+                "JUL","AUG","SEP","OCT","NOV","DEC"
+        };
+
+        for (String m : months) {
+            monthlyData.put(m, 0.0);
+        }
 
         for (RdPassbook p : passbooks) {
 
@@ -96,7 +93,8 @@ public class DashboardService {
                 String month = p.getRdDate()
                         .getMonth()
                         .toString()
-                        .substring(0, 3);
+                        .substring(0, 3)
+                        .toUpperCase();
 
                 monthlyData.put(
                         month,
@@ -111,7 +109,7 @@ public class DashboardService {
 
             Map<String, Object> map = new HashMap<>();
             map.put("month", entry.getKey());
-            map.put("amount", entry.getValue());
+            map.put("amount", Math.round(entry.getValue() * 100.0) / 100.0);
 
             result.add(map);
         }

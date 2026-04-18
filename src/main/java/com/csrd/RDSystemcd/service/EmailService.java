@@ -54,7 +54,7 @@ public class EmailService {
         </div>
         """.formatted(adminEmail, java.time.LocalDateTime.now());
 
-        helper.setText(html, true); // 🔥 HTML enable
+        helper.setText(html, true); //  HTML enable
 
         mailSender.send(message);
 

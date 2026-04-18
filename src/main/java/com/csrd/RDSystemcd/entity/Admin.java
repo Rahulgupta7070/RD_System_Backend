@@ -13,7 +13,7 @@ public class Admin {
     private String email;
     private String password;
 
-    // 🔥 REMOVE DEFAULT VALUE
+    // REMOVE DEFAULT VALUE
     private String role;
 
     // getters setters
